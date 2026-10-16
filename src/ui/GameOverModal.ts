@@ -147,14 +147,12 @@ export class GameOverModal {
       .map((entry, index) => {
         const rank = entry.rank || index + 1;
         const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
-        const defaultFace = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="%23112233" stroke="%2300f0ff" stroke-width="1.5"/><circle cx="16" cy="12" r="5" fill="%2300f0ff"/></svg>`;
-        const face = entry.face || defaultFace;
 
         return `
           <div class="leaderboard-row ${rankClass}">
             <div class="row-rank">#${rank}</div>
             <div class="row-pilot">
-              <img class="pilot-face" src="${face}" alt="" />
+              <span class="pilot-badge" style="background-color: ${entry.color || '#4b7bec'}">${(entry.name || '?').charAt(0).toUpperCase()}</span>
               <div class="pilot-details">
                 <span class="pilot-name">${this.escapeHtml(entry.name)}</span>
                 <span class="pilot-account">@${this.escapeHtml(entry.account)}</span>
@@ -380,12 +378,18 @@ export class GameOverModal {
         overflow: hidden;
       }
 
-      .pilot-face {
+      .pilot-badge {
         width: 24px;
         height: 24px;
         border-radius: 50%;
-        background: #0d1527;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 11px;
+        color: #ffffff;
         flex-shrink: 0;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
       }
 
       .pilot-details {

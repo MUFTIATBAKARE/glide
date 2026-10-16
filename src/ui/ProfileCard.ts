@@ -62,8 +62,14 @@ export class ProfileCard {
     const primaryColor = player.style?.primaryColor || '#00f0ff';
     const secondaryColor = player.style?.secondaryColor || '#ff0077';
 
-    // Safe avatar fallback
-    const faceSrc = player.face || `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="%230e1629" stroke="${encodeURIComponent(primaryColor)}" stroke-width="2"/><circle cx="20" cy="15" r="7" fill="${encodeURIComponent(primaryColor)}"/><path d="M 8 34 Q 20 22 32 34" fill="${encodeURIComponent(primaryColor)}"/></svg>`;
+    // Safe avatar fallback with single quotes inside SVG
+    const fallbackAvatar = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='18' fill='%230e1629' stroke='%2300f0ff' stroke-width='2'/><circle cx='20' cy='15' r='7' fill='%2300f0ff'/><path d='M 8 34 Q 20 22 32 34' fill='%2300f0ff'/></svg>";
+    let faceSrc = player.face ? player.face.trim() : '';
+    if (!faceSrc) {
+      faceSrc = fallbackAvatar;
+    } else if (faceSrc.startsWith('data:image/svg+xml')) {
+      faceSrc = faceSrc.replace(/"/g, "'");
+    }
 
     this.cardElement.style.setProperty('--user-primary', primaryColor);
     this.cardElement.style.setProperty('--user-secondary', secondaryColor);
@@ -71,7 +77,7 @@ export class ProfileCard {
     this.cardElement.innerHTML = `
       <div class="profile-inner">
         <div class="avatar-wrapper">
-          <img class="profile-avatar" src="${faceSrc}" alt="${this.escapeHtml(player.name)}" />
+          <img id="player-face" src="${faceSrc}" alt="${this.escapeHtml(player.name || 'Player')}" class="profile-avatar" />
           <div class="status-indicator ${isGuest ? 'guest' : 'online'}"></div>
         </div>
         <div class="info-group">
@@ -100,11 +106,11 @@ export class ProfileCard {
     `;
 
     // Handle avatar image error fallback
-    const imgEl = this.cardElement.querySelector('.profile-avatar') as HTMLImageElement | null;
+    const imgEl = this.cardElement.querySelector('#player-face') as HTMLImageElement | null;
     if (imgEl) {
       imgEl.onerror = () => {
         imgEl.onerror = null;
-        imgEl.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="%230e1629" stroke="%2300f0ff" stroke-width="2"/><circle cx="20" cy="15" r="7" fill="%2300f0ff"/><path d="M 8 34 Q 20 22 32 34" fill="%2300f0ff"/></svg>`;
+        imgEl.src = fallbackAvatar;
       };
     }
   }

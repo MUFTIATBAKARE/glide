@@ -25,13 +25,14 @@ export interface LeaderboardEntry {
   name: string;
   account: string;
   face?: string;
+  color?: string;
   stats: LeaderboardStats;
 }
 
 export const MOCK_GUEST_PLAYER: StartNgUser = {
   name: 'Cyber Runner',
   account: 'guest_runner',
-  face: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230b1326"/><circle cx="32" cy="32" r="28" fill="none" stroke="%2300f0ff" stroke-width="2"/><circle cx="24" cy="28" r="4" fill="%2300f0ff"/><circle cx="40" cy="28" r="4" fill="%2300f0ff"/><path d="M 22 42 Q 32 50 42 42" stroke="%23ff0077" stroke-width="3" fill="none" stroke-linecap="round"/></svg>',
+  face: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%230b1326'/><circle cx='32' cy='32' r='28' fill='none' stroke='%2300f0ff' stroke-width='2'/><circle cx='24' cy='28' r='4' fill='%2300f0ff'/><circle cx='40' cy='28' r='4' fill='%2300f0ff'/><path d='M 22 42 Q 32 50 42 42' stroke='%23ff0077' stroke-width='3' fill='none' stroke-linecap='round'/></svg>",
   guest: true,
   style: {
     primaryColor: '#00f0ff',
@@ -48,21 +49,24 @@ export const MOCK_LEADERBOARD_DATA: LeaderboardEntry[] = [
     rank: 1,
     name: 'NeonPhantom',
     account: 'phantom',
-    face: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%231a0933"/><circle cx="32" cy="32" r="28" fill="none" stroke="%23ff0077" stroke-width="2"/><polygon points="32,16 42,44 22,44" fill="%23ff0077"/></svg>',
+    color: '#ff0077',
+    face: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%231a0933'/><circle cx='32' cy='32' r='28' fill='none' stroke='%23ff0077' stroke-width='2'/><polygon points='32,16 42,44 22,44' fill='%23ff0077'/></svg>",
     stats: { distance: 18450, packets: 342 },
   },
   {
     rank: 2,
     name: 'PulseDrifter',
     account: 'drifter',
-    face: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%23062629"/><circle cx="32" cy="32" r="28" fill="none" stroke="%2300f0ff" stroke-width="2"/><circle cx="32" cy="32" r="12" fill="%2300f0ff"/></svg>',
+    color: '#00f0ff',
+    face: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%23062629'/><circle cx='32' cy='32' r='28' fill='none' stroke='%2300f0ff' stroke-width='2'/><circle cx='32' cy='32' r='12' fill='%2300f0ff'/></svg>",
     stats: { distance: 14220, packets: 280 },
   },
   {
     rank: 3,
     name: 'ByteVector',
     account: 'vector',
-    face: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%231a2010"/><circle cx="32" cy="32" r="28" fill="none" stroke="%2339ff14" stroke-width="2"/><rect x="22" y="22" width="20" height="20" fill="%2339ff14"/></svg>',
+    color: '#39ff14',
+    face: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%231a2010'/><circle cx='32' cy='32' r='28' fill='none' stroke='%2339ff14' stroke-width='2'/><rect x='22' y='22' width='20' height='20' fill='%2339ff14'/></svg>",
     stats: { distance: 11090, packets: 195 },
   },
 ];
@@ -392,6 +396,7 @@ export class StartNgService {
               name: user.name,
               account: user.account,
               face: user.face,
+              color: user.style?.primaryColor || '#00f0ff',
               stats: s,
             })),
           ];
