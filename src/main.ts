@@ -6,10 +6,11 @@ import { soundFx } from './services/SoundFx';
 import { ProfileCard } from './ui/ProfileCard';
 import { GameHud } from './ui/GameHud';
 import { GameOverModal } from './ui/GameOverModal';
+import { InstructionsModal } from './ui/InstructionsModal';
 import { PlayerMarble } from './entities/PlayerMarble';
 import { TrackManager } from './entities/TrackManager';
 
-type GameState = 'PLAYING' | 'FALLING' | 'GAMEOVER';
+type GameState = 'PLAYING' | 'FALLING' | 'GAMEOVER' | 'PAUSED';
 
 function initApp(): void {
   const container = document.getElementById('app') ?? document.body;
@@ -36,12 +37,66 @@ function initApp(): void {
   const trackManager = new TrackManager(sceneManager.scene);
   const playerMarble = new PlayerMarble(sceneManager.scene);
 
-  // Mount Floating Profile Card & In-Game HUD
+  // Mount Floating Profile Card
   const profileCard = new ProfileCard(container);
   profileCard.mount();
 
-  const gameHud = new GameHud(container);
+  // Instructions Tutorial Modal
+  const instructionsModal = new InstructionsModal({ container });
+
+  // Game Loop State
+  let gameState: GameState = 'PLAYING';
+  let distance: number = 0;
+  let packetsRouted: number = 0;
+  let fallVelocityY: number = 0;
+  const baseSpeed: number = 24.0;
+
+  function openInstructions(): void {
+    if (gameState === 'GAMEOVER') return;
+    const prevGameState = gameState;
+    gameState = 'PAUSED';
+    soundFx.updateRollHum(0, false);
+    instructionsModal.show(() => {
+      gameState = prevGameState;
+    });
+  }
+
+  // Mount In-Game HUD with Sound and Help triggers
+  const gameHud = new GameHud({
+    container,
+    onHelpClick: () => {
+      openInstructions();
+    },
+    onSoundToggle: () => {
+      const isMuted = soundFx.toggleMute();
+      return isMuted;
+    },
+  });
+
   const gameOverModal = new GameOverModal({ container });
+
+  // Check first visit to show instructions overlay automatically
+  const isFirstVisit = instructionsModal.checkFirstVisit(() => {
+    gameState = 'PLAYING';
+  });
+
+  if (isFirstVisit) {
+    gameState = 'PAUSED';
+    soundFx.updateRollHum(0, false);
+  }
+
+  // Global keyboard shortcuts for HUD utilities (M = Mute, H = Help)
+  const handleGlobalKeys = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+    if (e.code === 'KeyM') {
+      const isMuted = soundFx.toggleMute();
+      gameHud.setSoundMuted(isMuted);
+    } else if (e.code === 'KeyH' && !instructionsModal.isOpen()) {
+      openInstructions();
+    }
+  };
+  window.addEventListener('keydown', handleGlobalKeys);
 
   // Dynamic player custom styling
   const unsubscribePlayer = startNgService.onPlayerChange((player) => {
@@ -54,13 +109,6 @@ function initApp(): void {
   startNgService.whoAmI().catch((err) => {
     console.warn('Initial whoAmI fallback active:', err);
   });
-
-  // Game Loop State
-  let gameState: GameState = 'PLAYING';
-  let distance: number = 0;
-  let packetsRouted: number = 0;
-  let fallVelocityY: number = 0;
-  const baseSpeed: number = 24.0;
 
   function restartGame(): void {
     distance = 0;
@@ -80,7 +128,7 @@ function initApp(): void {
   // Game Loop setup
   const gameLoop = new GameLoop({
     onUpdate: (delta: number, elapsed: number) => {
-      if (gameState === 'GAMEOVER') {
+      if (gameState === 'GAMEOVER' || gameState === 'PAUSED') {
         return;
       }
 
@@ -163,9 +211,11 @@ function initApp(): void {
   // Support Vite Hot Module Replacement (HMR) teardown
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {
+      window.removeEventListener('keydown', handleGlobalKeys);
       unsubscribePlayer();
       profileCard.destroy();
       gameHud.destroy();
+      instructionsModal.destroy();
       gameOverModal.destroy();
       playerMarble.dispose();
       trackManager.dispose();
