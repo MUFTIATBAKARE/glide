@@ -77,8 +77,8 @@ export class TrackManager {
       });
     }
 
-    // Fill remaining view distance
-    while (this.segments.length < this.maxVisibleSegments) {
+    // Fill remaining view distance ensuring at least 220 units ahead of origin
+    while (this.cursorZ > -220 || this.segments.length < this.maxVisibleSegments) {
       this.createNextProceduralSegment();
     }
   }
@@ -335,8 +335,8 @@ export class TrackManager {
       this.recycleOldestSegment();
     }
 
-    // 3. Ensure we always maintain maxVisibleSegments ahead of the marble
-    while (this.segments.length < this.maxVisibleSegments) {
+    // 3. Ensure new track tiles spawn at least 150-200 units ahead of player.position.z
+    while (this.cursorZ > marbleZ - 200 || this.segments.length < this.maxVisibleSegments) {
       this.createNextProceduralSegment();
     }
   }
@@ -371,13 +371,35 @@ export class TrackManager {
   public getTrackAt(z: number): { x: number; y: number; width: number; exists: boolean } {
     for (const seg of this.segments) {
       // Note: track advances in negative Z, so startZ is greater than endZ
-      if (z <= seg.startZ && z >= seg.endZ) {
-        const t = (seg.startZ - z) / (seg.startZ - seg.endZ);
+      if (z <= seg.startZ + 0.1 && z >= seg.endZ - 0.1) {
+        const segLen = Math.max(seg.startZ - seg.endZ, 0.001);
+        const t = THREE.MathUtils.clamp((seg.startZ - z) / segLen, 0, 1);
         const x = THREE.MathUtils.lerp(seg.startX, seg.endX, t);
         const y = THREE.MathUtils.lerp(seg.startY, seg.endY, t);
         return { x, y, width: seg.width, exists: true };
       }
     }
+
+    // Fallback: if near track bounds, find the closest active segment
+    if (this.segments.length > 0) {
+      let closest = this.segments[0];
+      let minDist = Math.abs(z - (closest.startZ + closest.endZ) / 2);
+      for (let i = 1; i < this.segments.length; i++) {
+        const dist = Math.abs(z - (this.segments[i].startZ + this.segments[i].endZ) / 2);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = this.segments[i];
+        }
+      }
+      if (minDist < 25.0) {
+        const segLen = Math.max(closest.startZ - closest.endZ, 0.001);
+        const t = THREE.MathUtils.clamp((closest.startZ - z) / segLen, 0, 1);
+        const x = THREE.MathUtils.lerp(closest.startX, closest.endX, t);
+        const y = THREE.MathUtils.lerp(closest.startY, closest.endY, t);
+        return { x, y, width: closest.width, exists: true };
+      }
+    }
+
     return { x: 0, y: 0, width: 8.5, exists: false };
   }
 

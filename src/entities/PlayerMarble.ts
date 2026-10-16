@@ -380,7 +380,14 @@ export class PlayerMarble {
   /**
    * Main per-frame update handling physics, controls, animations, and particle emissions.
    */
-  public update(delta: number, elapsed: number, forwardDeltaZ: number = 0): void {
+  public update(
+    delta: number,
+    elapsed: number,
+    forwardDeltaZ: number = 0,
+    trackCenterX: number = 0,
+    trackWidth: number = 8.5,
+    clampToTrack: boolean = true
+  ): void {
     // 1. Process Input into Steering Direction (-1 to 1)
     let steerDir = 0;
     if (this.inputState.steerLeft) steerDir -= 1;
@@ -398,13 +405,19 @@ export class PlayerMarble {
 
     this.position.x += this.velocity.x * delta;
 
-    // Enforce track boundaries
-    if (this.position.x < -this.lateralBoundary) {
-      this.position.x = -this.lateralBoundary;
-      this.velocity.x = 0;
-    } else if (this.position.x > this.lateralBoundary) {
-      this.position.x = this.lateralBoundary;
-      this.velocity.x = 0;
+    // Enforce dynamic track boundaries on turns so the runner never hits invisible walls
+    if (clampToTrack) {
+      const halfW = Math.max(trackWidth / 2 - 0.2, 1.5);
+      const minX = trackCenterX - halfW;
+      const maxX = trackCenterX + halfW;
+
+      if (this.position.x < minX) {
+        this.position.x = minX;
+        this.velocity.x = 0;
+      } else if (this.position.x > maxX) {
+        this.position.x = maxX;
+        this.velocity.x = 0;
+      }
     }
 
     // Forward travel displacement

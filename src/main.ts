@@ -140,8 +140,13 @@ function initApp(): void {
         const forwardDeltaZ = -currentSpeed * delta;
         distance += currentSpeed * delta;
 
-        // Update kinematics and trail
-        playerMarble.update(delta, elapsed, forwardDeltaZ);
+        // Query track ahead for dynamic turn centering
+        const trackInfo = trackManager.getTrackAt(playerMarble.position.z);
+        const trackCenterX = trackInfo.exists ? trackInfo.x : 0;
+        const trackWidth = trackInfo.exists ? trackInfo.width : 8.5;
+
+        // Update kinematics and trail relative to track bounds on turns
+        playerMarble.update(delta, elapsed, forwardDeltaZ, trackCenterX, trackWidth, true);
         trackManager.update(playerMarble.position.z, delta, elapsed);
 
         // Check track collision and packet pickups
@@ -155,47 +160,55 @@ function initApp(): void {
         if (status.isOnTrack) {
           // Snap/glide marble smoothly on track elevation
           const targetY = status.trackY + playerMarble.radius;
-          playerMarble.position.y += (targetY - playerMarble.position.y) * Math.min(delta * 22, 1.0);
+          playerMarble.position.y += (targetY - playerMarble.position.y) * Math.min(delta * 24, 1.0);
           soundFx.updateRollHum(currentSpeed, true);
         } else {
           // Marble fell off track boundary!
           gameState = 'FALLING';
-          fallVelocityY = -2.0;
+          fallVelocityY = -4.0;
           soundFx.playFallOff();
+        }
+
+        // If marble drops below track or < -3, immediately trigger Game Over
+        if (playerMarble.position.y < status.trackY - 2.5 || playerMarble.position.y < -3.0) {
+          gameState = 'GAMEOVER';
+          gameHud.setVisible(false);
+          soundFx.updateRollHum(0, false);
+          gameOverModal.show(distance, packetsRouted, restartGame);
+          return;
         }
 
         gameHud.update(distance, packetsRouted);
       } else if (gameState === 'FALLING') {
         // Free-fall physics
-        fallVelocityY -= 42 * delta;
+        fallVelocityY -= 48 * delta;
         playerMarble.position.y += fallVelocityY * delta;
 
         const forwardDeltaZ = -currentSpeed * 0.4 * delta;
-        playerMarble.update(delta, elapsed, forwardDeltaZ);
+        playerMarble.update(delta, elapsed, forwardDeltaZ, 0, 8.5, false);
         trackManager.update(playerMarble.position.z, delta, elapsed);
 
-        // Terminate run once dropped sufficiently
-        if (playerMarble.position.y < -16.0) {
+        // Immediately trigger Game Over when dropping below -3
+        if (playerMarble.position.y < -3.0) {
           gameState = 'GAMEOVER';
           gameHud.setVisible(false);
           soundFx.updateRollHum(0, false);
           gameOverModal.show(distance, packetsRouted, restartGame);
+          return;
         }
       }
 
-      // Dynamic Chase Camera following the marble
-      const targetCamX = playerMarble.position.x * 0.45;
-      const targetCamY = Math.max(playerMarble.position.y + 4.8, 3.5);
-      const targetCamZ = playerMarble.position.z + 10.5;
+      // Camera directly follows the marble every frame (no lag or disappearing runner)
+      const CAMERA_OFFSET_Z = 10.0;
+      const CAMERA_OFFSET_Y = 5.2;
 
-      sceneManager.camera.position.x += (targetCamX - sceneManager.camera.position.x) * Math.min(delta * 8.0, 1.0);
-      sceneManager.camera.position.y += (targetCamY - sceneManager.camera.position.y) * Math.min(delta * 8.0, 1.0);
-      sceneManager.camera.position.z += (targetCamZ - sceneManager.camera.position.z) * Math.min(delta * 8.0, 1.0);
-
+      sceneManager.camera.position.z = playerMarble.position.z + CAMERA_OFFSET_Z;
+      sceneManager.camera.position.x = playerMarble.position.x * 0.3; // subtle horizontal damping
+      sceneManager.camera.position.y = Math.max(playerMarble.position.y + CAMERA_OFFSET_Y, 3.5);
       sceneManager.camera.lookAt(
-        playerMarble.position.x * 0.35,
-        Math.max(playerMarble.position.y + 0.5, 0),
-        playerMarble.position.z - 6.0
+        playerMarble.position.x,
+        playerMarble.position.y,
+        playerMarble.position.z - 10.0
       );
     },
     onRender: () => {
