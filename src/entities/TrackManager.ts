@@ -8,6 +8,12 @@ export interface DataPacket {
   collected: boolean;
 }
 
+export interface HazardObstacle {
+  mesh: THREE.Mesh;
+  position: THREE.Vector3;
+  size: number;
+}
+
 export interface TrackSegment {
   index: number;
   startZ: number;
@@ -19,6 +25,7 @@ export interface TrackSegment {
   width: number;
   meshGroup: THREE.Group;
   packets: DataPacket[];
+  hazards: HazardObstacle[];
   geometries: THREE.BufferGeometry[];
   materials: THREE.Material[];
 }
@@ -40,6 +47,10 @@ export class TrackManager {
   private packetMaterial: THREE.MeshStandardMaterial;
   private packetRingMaterial: THREE.MeshBasicMaterial;
 
+  // Red Hazard Obstacles (Firewalls / Corrupt Nodes)
+  private hazardGeo: THREE.BoxGeometry;
+  private hazardMaterial: THREE.MeshStandardMaterial;
+
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
@@ -58,6 +69,16 @@ export class TrackManager {
     this.packetRingMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0077,
       wireframe: true,
+    });
+
+    // 1x1x1 Red Glowing Hazard Cubes
+    this.hazardGeo = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+    this.hazardMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff0055,
+      emissive: 0xff0055,
+      emissiveIntensity: 0.95,
+      roughness: 0.2,
+      metalness: 0.8,
     });
 
     this.initInitialTrack();
@@ -227,15 +248,16 @@ export class TrackManager {
     meshGroup.add(centerStripeMesh);
 
     // --- 3. Collectible Data Packets ---
+    let packetLaneOffset: number | null = null;
     if (options.spawnPackets) {
       // Pick 1-3 packets along the segment
       const packetCount = Math.floor(Math.random() * 3) + 1;
-      const lanes = [-2.2, 0, 2.2]; // Left, center, right lanes
-      const laneOffset = lanes[Math.floor(Math.random() * lanes.length)];
+      const lanes = [-2.4, 0, 2.4]; // Left, center, right lanes
+      packetLaneOffset = lanes[Math.floor(Math.random() * lanes.length)];
 
       for (let p = 0; p < packetCount; p++) {
         const t = (p + 1) / (packetCount + 1);
-        const pX = startX + deltaX * t + laneOffset;
+        const pX = startX + deltaX * t + packetLaneOffset;
         const pY = startY + deltaY * t + 0.75;
         const pZ = startZ - this.segmentLength * t;
 
@@ -259,6 +281,36 @@ export class TrackManager {
       }
     }
 
+    // --- 4. Red Hazard Obstacles (Firewalls / Corrupt Nodes) ---
+    const hazards: HazardObstacle[] = [];
+    if (this.currentSegmentIndex > 2 && Math.random() < 0.65) {
+      const allLanes = [-2.4, 0, 2.4];
+      const availableLanes = packetLaneOffset !== null
+        ? allLanes.filter((l) => l !== packetLaneOffset)
+        : allLanes;
+
+      const hazardCount = Math.min(Math.random() < 0.5 ? 1 : 2, availableLanes.length);
+      const shuffledLanes = [...availableLanes].sort(() => Math.random() - 0.5);
+
+      for (let h = 0; h < hazardCount; h++) {
+        const laneOffset = shuffledLanes[h];
+        const t = hazardCount === 1 ? 0.5 : (h === 0 ? 0.35 : 0.7);
+        const hX = startX + deltaX * t + laneOffset;
+        const hY = startY + deltaY * t + 0.5; // 1x1x1 unit box sitting on the road (Y=0)
+        const hZ = startZ - this.segmentLength * t;
+
+        const hazardMesh = new THREE.Mesh(this.hazardGeo, this.hazardMaterial);
+        hazardMesh.position.set(hX, hY, hZ);
+        meshGroup.add(hazardMesh);
+
+        hazards.push({
+          mesh: hazardMesh,
+          position: new THREE.Vector3(hX, hY, hZ),
+          size: 1.0,
+        });
+      }
+    }
+
     this.scene.add(meshGroup);
 
     const segment: TrackSegment = {
@@ -272,6 +324,7 @@ export class TrackManager {
       width,
       meshGroup,
       packets,
+      hazards,
       geometries,
       materials,
     };
@@ -308,7 +361,7 @@ export class TrackManager {
    * Updates track animations (packet spinning/floating) and recycles off-screen segments.
    */
   public update(marbleZ: number, delta: number, elapsed: number): void {
-    // 1. Animate collectible Data Packets
+    // 1. Animate collectible Data Packets and Hazard Cubes
     for (const segment of this.segments) {
       for (const packet of segment.packets) {
         if (!packet.collected) {
@@ -318,6 +371,9 @@ export class TrackManager {
           packet.ringMesh.rotation.x = Math.PI / 2 + Math.sin(elapsed * 3.0) * 0.2;
           packet.mesh.position.y = packet.position.y + Math.sin(elapsed * 4.0 + packet.position.z) * 0.12;
         }
+      }
+      for (const hazard of segment.hazards) {
+        hazard.mesh.rotation.y += delta * 1.8;
       }
     }
 
@@ -410,9 +466,8 @@ export class TrackManager {
     }
 
     const halfW = trackInfo.width / 2;
-    const generousBuffer = 2.5; // generous buffer matching track curbs and roll margin
     const lateralDist = Math.abs(marblePos.x - trackInfo.x);
-    const isOnTrack = lateralDist <= (halfW + generousBuffer);
+    const isOnTrack = lateralDist <= halfW;
 
     // Check packet pickups in nearby segments
     const pickupRadius = marbleRadius + 0.7;
@@ -436,6 +491,29 @@ export class TrackManager {
       trackY: trackInfo.y,
       collectedPackets,
     };
+  }
+
+  /**
+   * Checks collision between player marble and all active hazards.
+   * If distance < (marbleRadius + hazardHalfSize), collision occurs.
+   */
+  public checkHazardCollision(playerPos: THREE.Vector3, playerRadius: number): boolean {
+    const hazardHalfSize = 0.5; // 1x1x1 unit box has half size 0.5
+    const collisionThreshold = playerRadius + hazardHalfSize;
+    const thresholdSq = collisionThreshold * collisionThreshold;
+
+    for (const seg of this.segments) {
+      for (const hazard of seg.hazards) {
+        // Fast Z check
+        if (Math.abs(hazard.position.z - playerPos.z) < collisionThreshold + 0.5) {
+          const distSq = hazard.position.distanceToSquared(playerPos);
+          if (distSq < thresholdSq) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -463,5 +541,7 @@ export class TrackManager {
     this.packetRingGeo.dispose();
     this.packetMaterial.dispose();
     this.packetRingMaterial.dispose();
+    this.hazardGeo.dispose();
+    this.hazardMaterial.dispose();
   }
 }

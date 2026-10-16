@@ -117,6 +117,26 @@ function initApp(): void {
     gameHud.setVisible(false);
     soundFx.updateRollHum(0, false);
     gameOverModal.show(distance, packetsRouted, restartGame);
+
+    // Dispatch score to start.ng parent window if embedded
+    try {
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: 'startng:score',
+            stats: {
+              distance: Math.floor(Math.max(0, distance)),
+              packets: packetsRouted,
+              score: Math.floor(Math.max(0, distance)) + packetsRouted * 50,
+              timestamp: Date.now(),
+            },
+          },
+          '*'
+        );
+      }
+    } catch {
+      // Audio/cross-origin safety catch
+    }
   }
 
   function restartGame(): void {
@@ -152,14 +172,16 @@ function initApp(): void {
         const forwardDeltaZ = -currentSpeed * safeDelta;
         distance += currentSpeed * safeDelta;
 
-        // Query track ahead for dynamic turn centering
-        const trackInfo = trackManager.getTrackAt(playerMarble.position.z);
-        const trackCenterX = trackInfo.x;
-        const trackWidth = trackInfo.width;
-
-        // Update kinematics and trail relative to track bounds on turns
-        playerMarble.update(safeDelta, elapsed, forwardDeltaZ, trackCenterX, trackWidth, true);
+        // Update kinematics and particle trail
+        playerMarble.update(safeDelta, elapsed, forwardDeltaZ);
         trackManager.update(playerMarble.position.z, safeDelta, elapsed);
+
+        // Check collision with red hazard obstacles (Firewalls / Corrupt Nodes)
+        if (trackManager.checkHazardCollision(playerMarble.position, playerMarble.radius)) {
+          soundFx.playCrash();
+          triggerGameOver('Collided with Firewall');
+          return;
+        }
 
         // Check track collision and packet pickups
         const status = trackManager.checkMarbleStatus(playerMarble.position, playerMarble.radius);
@@ -175,31 +197,32 @@ function initApp(): void {
           fallVelocityY = 0;
           soundFx.updateRollHum(currentSpeed, true);
         } else {
-          // Marble steered off the track boundary
+          // Marble steered off the track boundary into free fall
           gameState = 'FALLING';
           fallVelocityY = -2.0;
           soundFx.playFallOff();
         }
 
-        // Safe margin fall check: only trigger Game Over if player drops below -12
-        if (playerMarble.position.y < -12) {
-          triggerGameOver('Y-position fall threshold exceeded in PLAYING state (Y < -12)');
+        // Safe margin fall check: trigger Game Over if player drops below -8
+        if (playerMarble.position.y < -8) {
+          triggerGameOver('Fell into the void');
           return;
         }
 
         gameHud.update(distance, packetsRouted);
       } else if (gameState === 'FALLING') {
         // Free-fall physics
-        fallVelocityY -= 38 * safeDelta;
+        const gravity = 38.0;
+        fallVelocityY -= gravity * safeDelta;
         playerMarble.position.y += fallVelocityY * safeDelta;
 
         const forwardDeltaZ = -currentSpeed * 0.4 * safeDelta;
-        playerMarble.update(safeDelta, elapsed, forwardDeltaZ, 0, 8.5, false);
+        playerMarble.update(safeDelta, elapsed, forwardDeltaZ);
         trackManager.update(playerMarble.position.z, safeDelta, elapsed);
 
-        // Safe margin: trigger Game Over only when dropped into the void below -12
-        if (playerMarble.position.y < -12) {
-          triggerGameOver('Fell into void (Y < -12)');
+        // Trigger Game Over when marble drops into the void below -8
+        if (playerMarble.position.y < -8) {
+          triggerGameOver('Fell into the void');
           return;
         }
       }

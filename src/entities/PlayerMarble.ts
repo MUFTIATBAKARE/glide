@@ -383,10 +383,7 @@ export class PlayerMarble {
   public update(
     delta: number,
     elapsed: number,
-    forwardDeltaZ: number = 0,
-    trackCenterX: number = 0,
-    trackWidth: number = 8.5,
-    clampToTrack: boolean = true
+    forwardDeltaZ: number = 0
   ): void {
     // 1. Process Input into Steering Direction (-1 to 1)
     let steerDir = 0;
@@ -403,22 +400,8 @@ export class PlayerMarble {
     const targetLateralVelocity = steerDir * this.lateralSpeed;
     this.velocity.x += (targetLateralVelocity - this.velocity.x) * Math.min(delta * this.lateralDamping, 1.0);
 
+    // Unclamped lateral displacement - steering off the track leads to free fall
     this.position.x += this.velocity.x * delta;
-
-    // Enforce dynamic track boundaries on turns so the runner never hits invisible walls
-    if (clampToTrack) {
-      const halfW = Math.max(trackWidth / 2 - 0.2, 1.5);
-      const minX = trackCenterX - halfW;
-      const maxX = trackCenterX + halfW;
-
-      if (this.position.x < minX) {
-        this.position.x = minX;
-        this.velocity.x = 0;
-      } else if (this.position.x > maxX) {
-        this.position.x = maxX;
-        this.velocity.x = 0;
-      }
-    }
 
     // Forward travel displacement
     this.position.z += forwardDeltaZ;
