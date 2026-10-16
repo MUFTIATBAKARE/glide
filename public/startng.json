@@ -1,0 +1,18 @@
+{
+  "leaderboard": {
+    "stats": [
+      {
+        "key": "distance",
+        "label": "Distance (m)",
+        "order": "highest",
+        "format": "number"
+      },
+      {
+        "key": "packets",
+        "label": "Packets Routed",
+        "order": "highest",
+        "format": "number"
+      }
+    ]
+  }
+}

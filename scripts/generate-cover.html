@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Glide Cover Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 1600px;
+      height: 1000px;
+      overflow: hidden;
+      background: #040713;
+    }
+    canvas {
+      display: block;
+      width: 1600px;
+      height: 1000px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="coverCanvas" width="1600" height="1000"></canvas>
+  <script>
+    const canvas = document.getElementById('coverCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const W = 1600;
+    const H = 1000;
+
+    // 1. Deep Space Cyber Gradient Background
+    const bgGrad = ctx.createRadialGradient(W / 2, H * 0.42, 50, W / 2, H / 2, W * 0.85);
+    bgGrad.addColorStop(0, '#101c38');
+    bgGrad.addColorStop(0.35, '#0a1024');
+    bgGrad.addColorStop(0.75, '#050814');
+    bgGrad.addColorStop(1, '#020308');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Starfield / Cyber dust
+    const rng = (seed) => {
+      let x = Math.sin(seed++) * 10000;
+      return x - Math.floor(x);
+    };
+    for (let i = 0; i < 280; i++) {
+      const sx = rng(i * 3 + 1) * W;
+      const sy = rng(i * 3 + 2) * H * 0.7;
+      const r = rng(i * 3 + 3) * 1.8 + 0.4;
+      const alpha = rng(i * 3 + 4) * 0.7 + 0.2;
+      ctx.fillStyle = i % 3 === 0 ? `rgba(0, 240, 255, ${alpha})` : (i % 3 === 1 ? `rgba(255, 0, 119, ${alpha})` : `rgba(255, 255, 255, ${alpha})`);
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Perspective Cyber Runway Grid
+    const vpX = W / 2;
+    const vpY = 460;
+    const horizonY = 460;
+
+    // Horizon Glow
+    const horizGrad = ctx.createLinearGradient(0, horizonY - 40, 0, horizonY + 80);
+    horizGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
+    horizGrad.addColorStop(0.5, 'rgba(0, 240, 255, 0.45)');
+    horizGrad.addColorStop(1, 'rgba(255, 0, 119, 0)');
+    ctx.fillStyle = horizGrad;
+    ctx.fillRect(0, horizonY - 40, W, 120);
+
+    // Track Perspective Floor
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(vpX - 60, vpY);
+    ctx.lineTo(vpX + 60, vpY);
+    ctx.lineTo(W * 0.88, H);
+    ctx.lineTo(W * 0.12, H);
+    ctx.closePath();
+    ctx.clip();
+
+    const trackGrad = ctx.createLinearGradient(0, vpY, 0, H);
+    trackGrad.addColorStop(0, '#0a1428');
+    trackGrad.addColorStop(0.5, '#070c18');
+    trackGrad.addColorStop(1, '#03050c');
+    ctx.fillStyle = trackGrad;
+    ctx.fillRect(0, vpY, W, H - vpY);
+
+    // Horizontal grid lines
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i <= 24; i++) {
+      const p = Math.pow(i / 24, 2.6);
+      const y = vpY + (H - vpY) * p;
+      const alpha = 0.15 + p * 0.65;
+      ctx.strokeStyle = `rgba(0, 240, 255, ${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    // Longitudinal grid lines
+    const numLanes = 14;
+    for (let i = 0; i <= numLanes; i++) {
+      const t = i / numLanes;
+      const topX = (vpX - 60) + (120) * t;
+      const botX = (W * 0.12) + (W * 0.76) * t;
+      ctx.strokeStyle = i === 0 || i === numLanes ? 'rgba(0, 240, 255, 0.9)' : (i === numLanes / 2 ? 'rgba(255, 0, 119, 0.7)' : 'rgba(0, 240, 255, 0.25)');
+      ctx.lineWidth = i === 0 || i === numLanes ? 4 : (i === numLanes / 2 ? 3 : 1.2);
+      ctx.beginPath();
+      ctx.moveTo(topX, vpY);
+      ctx.lineTo(botX, H);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Side Rail Neon Beams
+    ctx.save();
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 25;
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(vpX - 60, vpY);
+    ctx.lineTo(W * 0.12, H);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(vpX + 60, vpY);
+    ctx.lineTo(W * 0.88, H);
+    ctx.stroke();
+    ctx.restore();
+
+    // Magenta Outer Guard Rails
+    ctx.save();
+    ctx.shadowColor = '#ff0077';
+    ctx.shadowBlur = 20;
+    ctx.strokeStyle = '#ff0077';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(vpX - 90, vpY);
+    ctx.lineTo(W * 0.05, H);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(vpX + 90, vpY);
+    ctx.lineTo(W * 0.95, H);
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. Collectible Data Packets Flanking the Marble
+    function drawDataPacket(cx, cy, size, color) {
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = color;
+
+      // Octahedron / Diamond
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - size);
+      ctx.lineTo(cx + size * 0.7, cy);
+      ctx.lineTo(cx, cy + size);
+      ctx.lineTo(cx - size * 0.7, cy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Inner Highlight
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - size * 0.6);
+      ctx.lineTo(cx + size * 0.35, cy);
+      ctx.lineTo(cx, cy + size * 0.6);
+      ctx.lineTo(cx - size * 0.35, cy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Spinning Orbit Ring
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, size * 1.3, size * 0.5, -Math.PI / 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    drawDataPacket(440, 680, 24, '#00f0ff');
+    drawDataPacket(360, 560, 16, '#00f0ff');
+    drawDataPacket(1160, 680, 24, '#00f0ff');
+    drawDataPacket(1240, 560, 16, '#00f0ff');
+    drawDataPacket(800, 480, 10, '#ff0077');
+
+    // 4. Laser Trail Particles Behind Marble
+    const marbleX = W / 2;
+    const marbleY = 640;
+    const marbleRadius = 135;
+
+    ctx.save();
+    for (let p = 0; p < 90; p++) {
+      const t = p / 90;
+      const px = marbleX + (rng(p * 7) - 0.5) * (80 + t * 160);
+      const py = marbleY - 20 - t * 180 + (rng(p * 11) - 0.5) * 30;
+      const pRad = (1 - t) * 6 + 1;
+      const alpha = (1 - t) * 0.85;
+
+      ctx.fillStyle = p % 2 === 0 ? `rgba(0, 240, 255, ${alpha})` : `rgba(255, 0, 119, ${alpha})`;
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(px, py, pRad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 5. Hero Cyber Marble
+    // Outer Glow Aura
+    const auraGrad = ctx.createRadialGradient(marbleX, marbleY, marbleRadius * 0.6, marbleX, marbleY, marbleRadius * 2.1);
+    auraGrad.addColorStop(0, 'rgba(0, 240, 255, 0.45)');
+    auraGrad.addColorStop(0.4, 'rgba(255, 0, 119, 0.25)');
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = auraGrad;
+    ctx.beginPath();
+    ctx.arc(marbleX, marbleY, marbleRadius * 2.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer Containment Ring 1 (Tilted Magenta Ring)
+    ctx.save();
+    ctx.shadowColor = '#ff0077';
+    ctx.shadowBlur = 30;
+    ctx.strokeStyle = '#ff0077';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(marbleX, marbleY, marbleRadius * 1.65, marbleRadius * 0.55, -Math.PI / 5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Ring Dashes
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([14, 18]);
+    ctx.stroke();
+    ctx.restore();
+
+    // Outer Containment Ring 2 (Cyan Equatorial Ring)
+    ctx.save();
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 25;
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.ellipse(marbleX, marbleY, marbleRadius * 1.5, marbleRadius * 0.45, Math.PI / 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Marble Sphere Body
+    ctx.save();
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 45;
+
+    const sphereGrad = ctx.createRadialGradient(
+      marbleX - marbleRadius * 0.35,
+      marbleY - marbleRadius * 0.4,
+      marbleRadius * 0.1,
+      marbleX,
+      marbleY,
+      marbleRadius
+    );
+    sphereGrad.addColorStop(0, '#ffffff');
+    sphereGrad.addColorStop(0.2, '#66ffff');
+    sphereGrad.addColorStop(0.55, '#00aacc');
+    sphereGrad.addColorStop(0.85, '#0a3355');
+    sphereGrad.addColorStop(1, '#030d1c');
+
+    ctx.fillStyle = sphereGrad;
+    ctx.beginPath();
+    ctx.arc(marbleX, marbleY, marbleRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Hexagonal Cyber Wireframe overlay on Marble
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(marbleX, marbleY, marbleRadius - 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
+    ctx.lineWidth = 1.5;
+    const hexSize = 26;
+    for (let y = marbleY - marbleRadius; y <= marbleY + marbleRadius; y += hexSize * 1.5) {
+      for (let x = marbleX - marbleRadius; x <= marbleX + marbleRadius; x += hexSize * Math.sqrt(3)) {
+        ctx.beginPath();
+        for (let a = 0; a < 6; a++) {
+          const angle = (a * Math.PI) / 3;
+          const hx = x + hexSize * Math.cos(angle);
+          const hy = y + hexSize * Math.sin(angle);
+          if (a === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // Specular Core Reflection Flare
+    ctx.save();
+    const flareGrad = ctx.createRadialGradient(
+      marbleX - marbleRadius * 0.38,
+      marbleY - marbleRadius * 0.42,
+      2,
+      marbleX - marbleRadius * 0.38,
+      marbleY - marbleRadius * 0.42,
+      marbleRadius * 0.55
+    );
+    flareGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    flareGrad.addColorStop(0.3, 'rgba(0, 240, 255, 0.6)');
+    flareGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+    ctx.fillStyle = flareGrad;
+    ctx.beginPath();
+    ctx.arc(marbleX - marbleRadius * 0.38, marbleY - marbleRadius * 0.42, marbleRadius * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Orbiting Satellite Telemetry Nodes
+    function drawSatellite(sx, sy, col) {
+      ctx.save();
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 16, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sx - 4, sy - 4, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    drawSatellite(marbleX - marbleRadius * 1.45, marbleY - 45, '#ffd1a4');
+    drawSatellite(marbleX + marbleRadius * 1.45, marbleY + 45, '#00e5ff');
+
+    // Spiked Crown Halo Hovering Above Marble
+    ctx.save();
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 24;
+    const crownY = marbleY - marbleRadius - 38;
+
+    // Halo Ring
+    ctx.strokeStyle = '#ff0077';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.ellipse(marbleX, crownY, marbleRadius * 0.85, 20, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Crown Spikes
+    ctx.fillStyle = '#00f0ff';
+    const numSpikes = 7;
+    for (let i = 0; i < numSpikes; i++) {
+      const angle = (i / (numSpikes - 1)) * Math.PI;
+      const spkX = marbleX - (marbleRadius * 0.8) * Math.cos(angle);
+      const spkY = crownY + 12 * Math.sin(angle);
+      const spikeH = 34 - Math.abs(i - 3) * 4;
+
+      ctx.beginPath();
+      ctx.moveTo(spkX - 8, spkY);
+      ctx.lineTo(spkX, spkY - spikeH);
+      ctx.lineTo(spkX + 8, spkY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 6. Bold Title "GLIDE"
+    ctx.save();
+    const titleText = "GLIDE";
+    const titleY = 220;
+
+    ctx.font = '900 168px "Arial Black", "Montserrat", "Impact", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Massive Cyan/Magenta Glow Underlayers
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 50;
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.4)';
+    ctx.fillText(titleText, W / 2, titleY);
+
+    ctx.shadowColor = '#ff0077';
+    ctx.shadowBlur = 35;
+    ctx.fillStyle = 'rgba(255, 0, 119, 0.4)';
+    ctx.fillText(titleText, W / 2, titleY);
+
+    // Sharp Gradient Foreground
+    const textGrad = ctx.createLinearGradient(0, titleY - 80, 0, titleY + 80);
+    textGrad.addColorStop(0, '#ffffff');
+    textGrad.addColorStop(0.35, '#e0ffff');
+    textGrad.addColorStop(0.65, '#00f0ff');
+    textGrad.addColorStop(1, '#ff0077');
+    ctx.fillStyle = textGrad;
+    ctx.fillText(titleText, W / 2, titleY);
+
+    // Title Border Stroke
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.strokeText(titleText, W / 2, titleY);
+    ctx.restore();
+
+    // 7. Subtitle / Cyber Taglines
+    ctx.save();
+    ctx.font = '800 24px "Segoe UI", -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '8px';
+    ctx.fillStyle = '#00f0ff';
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 16;
+    ctx.fillText("HIGH-SPEED 3D CYBER RUNNER", W / 2, 295);
+
+    // Platform Badge
+    ctx.font = '700 16px "SF Mono", Monaco, Consolas, monospace';
+    ctx.fillStyle = '#ff0077';
+    ctx.shadowColor = '#ff0077';
+    ctx.shadowBlur = 12;
+    ctx.fillText("HOSTED ON START.NG  //  THREE.JS WEBGL ENGINE", W / 2, 330);
+    ctx.restore();
+
+    // Mark done for headless capture
+    window.__canvasRendered = true;
+  </script>
+</body>
+</html>
