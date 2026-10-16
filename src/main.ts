@@ -110,6 +110,15 @@ function initApp(): void {
     console.warn('Initial whoAmI fallback active:', err);
   });
 
+  function triggerGameOver(reason: string = 'Unknown'): void {
+    if (gameState === 'GAMEOVER') return;
+    console.log('Game Over triggered by:', reason, 'at position:', playerMarble.position);
+    gameState = 'GAMEOVER';
+    gameHud.setVisible(false);
+    soundFx.updateRollHum(0, false);
+    gameOverModal.show(distance, packetsRouted, restartGame);
+  }
+
   function restartGame(): void {
     distance = 0;
     packetsRouted = 0;
@@ -132,22 +141,25 @@ function initApp(): void {
         return;
       }
 
+      // Guard Delta Timing to avoid coordinate jumps after tab switching or momentary frame drops
+      const safeDelta = Math.min(Math.max(delta, 0.0001), 0.1);
+
       // Dynamic speed progression as player travels further
       const speedMultiplier = 1 + Math.min(distance / 5000, 0.6);
       const currentSpeed = baseSpeed * speedMultiplier;
 
       if (gameState === 'PLAYING') {
-        const forwardDeltaZ = -currentSpeed * delta;
-        distance += currentSpeed * delta;
+        const forwardDeltaZ = -currentSpeed * safeDelta;
+        distance += currentSpeed * safeDelta;
 
         // Query track ahead for dynamic turn centering
         const trackInfo = trackManager.getTrackAt(playerMarble.position.z);
-        const trackCenterX = trackInfo.exists ? trackInfo.x : 0;
-        const trackWidth = trackInfo.exists ? trackInfo.width : 8.5;
+        const trackCenterX = trackInfo.x;
+        const trackWidth = trackInfo.width;
 
         // Update kinematics and trail relative to track bounds on turns
-        playerMarble.update(delta, elapsed, forwardDeltaZ, trackCenterX, trackWidth, true);
-        trackManager.update(playerMarble.position.z, delta, elapsed);
+        playerMarble.update(safeDelta, elapsed, forwardDeltaZ, trackCenterX, trackWidth, true);
+        trackManager.update(playerMarble.position.z, safeDelta, elapsed);
 
         // Check track collision and packet pickups
         const status = trackManager.checkMarbleStatus(playerMarble.position, playerMarble.radius);
@@ -158,42 +170,36 @@ function initApp(): void {
         }
 
         if (status.isOnTrack) {
-          // Snap/glide marble smoothly on track elevation
-          const targetY = status.trackY + playerMarble.radius;
-          playerMarble.position.y += (targetY - playerMarble.position.y) * Math.min(delta * 24, 1.0);
+          // Snap/ground marble firmly on track surface (trackY + radius)
+          playerMarble.position.y = status.trackY + playerMarble.radius;
+          fallVelocityY = 0;
           soundFx.updateRollHum(currentSpeed, true);
         } else {
-          // Marble fell off track boundary!
+          // Marble steered off the track boundary
           gameState = 'FALLING';
-          fallVelocityY = -4.0;
+          fallVelocityY = -2.0;
           soundFx.playFallOff();
         }
 
-        // If marble drops below track or < -3, immediately trigger Game Over
-        if (playerMarble.position.y < status.trackY - 2.5 || playerMarble.position.y < -3.0) {
-          gameState = 'GAMEOVER';
-          gameHud.setVisible(false);
-          soundFx.updateRollHum(0, false);
-          gameOverModal.show(distance, packetsRouted, restartGame);
+        // Safe margin fall check: only trigger Game Over if player drops below -12
+        if (playerMarble.position.y < -12) {
+          triggerGameOver('Y-position fall threshold exceeded in PLAYING state (Y < -12)');
           return;
         }
 
         gameHud.update(distance, packetsRouted);
       } else if (gameState === 'FALLING') {
         // Free-fall physics
-        fallVelocityY -= 48 * delta;
-        playerMarble.position.y += fallVelocityY * delta;
+        fallVelocityY -= 38 * safeDelta;
+        playerMarble.position.y += fallVelocityY * safeDelta;
 
-        const forwardDeltaZ = -currentSpeed * 0.4 * delta;
-        playerMarble.update(delta, elapsed, forwardDeltaZ, 0, 8.5, false);
-        trackManager.update(playerMarble.position.z, delta, elapsed);
+        const forwardDeltaZ = -currentSpeed * 0.4 * safeDelta;
+        playerMarble.update(safeDelta, elapsed, forwardDeltaZ, 0, 8.5, false);
+        trackManager.update(playerMarble.position.z, safeDelta, elapsed);
 
-        // Immediately trigger Game Over when dropping below -3
-        if (playerMarble.position.y < -3.0) {
-          gameState = 'GAMEOVER';
-          gameHud.setVisible(false);
-          soundFx.updateRollHum(0, false);
-          gameOverModal.show(distance, packetsRouted, restartGame);
+        // Safe margin: trigger Game Over only when dropped into the void below -12
+        if (playerMarble.position.y < -12) {
+          triggerGameOver('Fell into void (Y < -12)');
           return;
         }
       }

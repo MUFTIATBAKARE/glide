@@ -27,7 +27,6 @@ export class TrackManager {
   private scene: THREE.Scene;
   private segments: TrackSegment[] = [];
   private segmentLength: number = 20.0;
-  private maxVisibleSegments: number = 22;
   private currentSegmentIndex: number = 0;
 
   // Track cursor tracking for procedural generation
@@ -69,7 +68,7 @@ export class TrackManager {
    */
   private initInitialTrack(): void {
     // Generate initial flat straight runway
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       this.createSegment({
         forceStraight: true,
         forceFlat: true,
@@ -77,25 +76,23 @@ export class TrackManager {
       });
     }
 
-    // Fill remaining view distance ensuring at least 220 units ahead of origin
-    while (this.cursorZ > -220 || this.segments.length < this.maxVisibleSegments) {
+    // Maintain a buffer of at least 300-350 units ahead of origin
+    while (this.cursorZ > -350) {
       this.createNextProceduralSegment();
     }
   }
 
   /**
-   * Procedurally generates the next track segment with turns, drops, and packet lanes.
+   * Procedurally generates the next track segment with turns and packet lanes.
+   * Keeps track surface level at Y=0 to avoid false positive vertical fall triggers.
    */
   private createNextProceduralSegment(): void {
     const isTurn = Math.random() < 0.45;
-    const isDrop = Math.random() < 0.35;
-
     let deltaX = 0;
-    let deltaY = 0;
 
     if (isTurn) {
-      // Gentle curve left or right (-3.5 to +3.5)
-      const turnAmount = (Math.random() * 2 - 1) * 3.5;
+      // Gentle curve left or right (-3.2 to +3.2)
+      const turnAmount = (Math.random() * 2 - 1) * 3.2;
       deltaX = turnAmount;
 
       // Keep track centered within reasonable bounds (-14 to +14)
@@ -103,13 +100,8 @@ export class TrackManager {
       if (this.cursorX + deltaX < -14) deltaX = Math.abs(deltaX);
     }
 
-    if (isDrop) {
-      // Elevation drop (sloping downwards)
-      deltaY = -(Math.random() * 2.5 + 1.2);
-    } else if (Math.random() < 0.2 && this.cursorY < -10) {
-      // Occasional gentle elevation rise if we dropped deep
-      deltaY = Math.random() * 1.5;
-    }
+    // Level runway at ground level (Y=0)
+    const deltaY = 0;
 
     this.createSegment({
       deltaX,
@@ -329,14 +321,13 @@ export class TrackManager {
       }
     }
 
-    // 2. Recycle segments that have passed behind the player
-    // A segment is behind when its endZ is greater than marbleZ + 30
-    while (this.segments.length > 0 && this.segments[0].endZ > marbleZ + 30.0) {
+    // 2. Recycle old segments safely behind the camera only when segment.endZ > marbleZ + 50
+    while (this.segments.length > 0 && this.segments[0].endZ > marbleZ + 50.0) {
       this.recycleOldestSegment();
     }
 
-    // 3. Ensure new track tiles spawn at least 150-200 units ahead of player.position.z
-    while (this.cursorZ > marbleZ - 200 || this.segments.length < this.maxVisibleSegments) {
+    // 3. Maintain a buffer of at least 300 units ahead of player.position.z at all times
+    while (this.cursorZ > marbleZ - 300) {
       this.createNextProceduralSegment();
     }
   }
@@ -419,8 +410,9 @@ export class TrackManager {
     }
 
     const halfW = trackInfo.width / 2;
+    const generousBuffer = 2.5; // generous buffer matching track curbs and roll margin
     const lateralDist = Math.abs(marblePos.x - trackInfo.x);
-    const isOnTrack = lateralDist <= halfW;
+    const isOnTrack = lateralDist <= (halfW + generousBuffer);
 
     // Check packet pickups in nearby segments
     const pickupRadius = marbleRadius + 0.7;

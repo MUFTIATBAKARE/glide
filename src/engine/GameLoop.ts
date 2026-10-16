@@ -58,9 +58,9 @@ export class GameLoop {
   private tick(currentTime: number): void {
     if (!this.isRunning) return;
 
-    // Calculate delta time in seconds, clamped for hardware and tab-switch safety
+    // Calculate delta time in seconds, capped for hardware, tab-switch, and frame drop safety
     const rawDelta = (currentTime - this.lastTime) / 1000;
-    const delta = Math.min(Math.max(rawDelta, 0), this.maxDelta);
+    const delta = Math.min(Math.max(rawDelta, 0.0001), this.maxDelta);
     this.lastTime = currentTime;
     this.totalElapsed += delta;
 
